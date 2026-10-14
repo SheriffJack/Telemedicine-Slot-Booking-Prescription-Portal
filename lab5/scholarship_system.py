@@ -22,6 +22,7 @@ BINARY_OPS = {
 }
 UNARY_OPS = {ast.UAdd: operator.pos, ast.USub: operator.neg}
 
+
 def safe_eval(node, variables):
     """Evaluate a parsed arithmetic expression using only whitelisted nodes.
 
@@ -44,6 +45,7 @@ def safe_eval(node, variables):
         return UNARY_OPS[type(node.op)](safe_eval(node.operand, variables))
     raise ValueError("Unsupported element in merit formula")
 
+
 def evaluate_formula(formula, gpa, credit_count):
     """Evaluate ``formula`` for the given GPA and credits, safely."""
     try:
@@ -52,9 +54,11 @@ def evaluate_formula(formula, gpa, credit_count):
     except (SyntaxError, ZeroDivisionError) as exc:
         raise ValueError(f"Invalid merit formula: {formula}") from exc
 
+
 def calculate_merit_score(gpa, credit_count):
     """Return the merit score for a GPA and credit count."""
     return evaluate_formula(CONFIG["merit_formula"], gpa, credit_count)
+
 
 def evaluate_applicant(student_id, test_scores, logs=None):
     """Score one applicant, record the result and return eligibility.
@@ -71,15 +75,18 @@ def evaluate_applicant(student_id, test_scores, logs=None):
         logs.append(f"{student_id} scored {score}")
     return eligible
 
+
 def change_formula(new_formula):
     """Replace the merit formula after checking that it is valid."""
     evaluate_formula(new_formula, 1, 1)  # reject bad formulas up front
     CONFIG["merit_formula"] = new_formula
 
+
 def persist_results(file="scholarships.json"):
     """Write the current results to a JSON file."""
     with open(file, "w", encoding="utf-8") as handle:
         json.dump(results, handle)
+
 
 def load_results(file="scholarships.json"):
     """Load results from a JSON file, keeping current ones on failure."""
@@ -95,12 +102,14 @@ def load_results(file="scholarships.json"):
     results.clear()
     results.update(loaded)
 
+
 def print_shortlist():
     """Print every applicant marked eligible."""
     print("Shortlisted applicants:")
     for student_id, record in results.items():
         if record["eligible"]:
             print(" ", student_id, "score =", record["score"])
+
 
 def main():
     """Run the demo: evaluate sample applicants and print the shortlist."""
@@ -118,6 +127,7 @@ def main():
     persist_results()
     load_results()
     print_shortlist()
+
 
 if __name__ == "__main__":
     main()
