@@ -1,0 +1,106 @@
+import pytest
+from amusement_park_ride_access import process_ride_admissions, inspect_safety_restraints
+
+
+def make_group(ride_type="family", patrons=None, is_open=True, fast_lane=False):
+    return {
+        "is_open": is_open,
+        "ride_type": ride_type,
+        "has_fast_lane": fast_lane,
+        "patrons": patrons if patrons is not None else [],
+    }
+
+
+def make_patron(height_cm=150, health_warning=False, is_child=False):
+    return {"height_cm": height_cm, "health_warning": health_warning, "is_child": is_child}
+
+
+# ---------- process_ride_admissions ----------
+
+def test_single_adult_family_ride():
+    groups = [make_group("family", [make_patron()])]
+    result = process_ride_admissions(groups, 5.0)
+    assert result["total_revenue"] == 10.0
+    assert result["status"] == "COMPLETED"
+
+
+def test_invalid_groups_type_raises():
+    with pytest.raises(ValueError):
+        process_ride_admissions("not a list", 5.0)
+
+
+def test_negative_fee_raises():
+    with pytest.raises(ValueError):
+        process_ride_admissions([], -1.0)
+
+
+def test_closed_group_is_skipped():
+    result = process_ride_admissions([make_group(is_open=False, patrons=[make_patron()])], 5.0)
+    assert result == {"total_revenue": 0.0, "status": "ZERO_ADMISSIONS"}
+
+
+def test_roller_coaster_adult():
+    result = process_ride_admissions([make_group("roller_coaster", [make_patron()])], 5.0)
+    assert result == {"total_revenue": 25.0, "status": "COMPLETED"}
+
+
+def test_water_ride_adult():
+    result = process_ride_admissions([make_group("water_ride", [make_patron()])], 5.0)
+    assert result == {"total_revenue": 18.0, "status": "COMPLETED"}
+
+
+def test_unknown_ride_type_rejected():
+    result = process_ride_admissions([make_group("bumper_cars", [make_patron()])], 5.0)
+    assert result == {"total_revenue": 0.0, "status": "ZERO_ADMISSIONS"}
+
+
+def test_child_gets_discount():
+    result = process_ride_admissions([make_group("family", [make_patron(is_child=True)])], 5.0)
+    assert result["total_revenue"] == pytest.approx(6.0)
+
+
+def test_too_short_patron_rejected():
+    result = process_ride_admissions([make_group("family", [make_patron(height_cm=100)])], 5.0)
+    assert result["status"] == "ZERO_ADMISSIONS"
+
+
+def test_invalid_height_rejected():
+    result = process_ride_admissions([make_group("family", [make_patron(height_cm=0)])], 5.0)
+    assert result["status"] == "ZERO_ADMISSIONS"
+
+
+def test_health_warning_on_family_ride_only_rejects_that_patron():
+    patrons = [make_patron(health_warning=True), make_patron()]
+    result = process_ride_admissions([make_group("family", patrons)], 5.0)
+    assert result == {"total_revenue": 10.0, "status": "COMPLETED"}
+
+
+def test_health_warning_on_roller_coaster_voids_group():
+    patrons = [make_patron(), make_patron(health_warning=True), make_patron()]
+    result = process_ride_admissions([make_group("roller_coaster", patrons)], 5.0)
+    assert result == {"total_revenue": 0.0, "status": "ZERO_ADMISSIONS"}
+
+
+def test_fast_lane_fee_added():
+    result = process_ride_admissions([make_group("family", [make_patron()], fast_lane=True)], 5.0)
+    assert result["total_revenue"] == 15.0
+
+
+def test_safety_audit_when_more_than_four_rejections():
+    patrons = [make_patron(height_cm=100) for _ in range(5)]
+    result = process_ride_admissions([make_group("family", patrons + [make_patron()])], 5.0)
+    assert result == {"total_revenue": 10.0, "status": "SAFETY_AUDIT"}
+
+
+# ---------- inspect_safety_restraints ----------
+
+def test_restraints_no_data():
+    assert inspect_safety_restraints([]) == "NO_DATA"
+
+
+def test_restraints_emergency_lock():
+    assert inspect_safety_restraints([[1, 0, 0]]) == "EMERGENCY_LOCK"
+
+
+def test_restraints_safe():
+    assert inspect_safety_restraints([[1, 1], [1, 0, 1]]) == "SAFE"
